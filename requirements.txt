@@ -1,0 +1,18 @@
+# Core Python version
+python>=3.9
+
+# Core logic
+numpy
+faiss-cpu
+langchain
+huggingface_hub
+
+# File parsing
+pymupdf
+python-docx
+
+# Web interface
+gradio
+
+# Environment variables
+python-dotenv
