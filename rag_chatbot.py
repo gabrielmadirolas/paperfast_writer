@@ -1,5 +1,6 @@
 # rag_chatbot.py
 import os
+from dotenv import load_dotenv
 import numpy as np
 import faiss
 try:
@@ -7,11 +8,12 @@ try:
 except ImportError:
     import fitz as pymupdf
 import docx
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from huggingface_hub import InferenceApi
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from huggingface_hub import InferenceClient
 from typing import List, Tuple
 
 # -------- Configuration --------
+load_dotenv()
 HF_TOKEN = os.getenv("HF_API_TOKEN")
 if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
@@ -20,8 +22,8 @@ EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 GEN_MODEL = "google/flan-t5-base"
 
 # -------- Hugging Face Clients --------
-embed_client = InferenceApi(repo_id=EMBED_MODEL, token=HF_TOKEN)
-gen_client = InferenceApi(repo_id=GEN_MODEL, token=HF_TOKEN)
+embed_client = InferenceClient(model=EMBED_MODEL, token=HF_TOKEN)
+gen_client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
 
 # -------- File Readers --------
 def extract_text_from_pdf(path: str) -> str:
