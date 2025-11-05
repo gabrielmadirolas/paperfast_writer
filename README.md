@@ -47,10 +47,3 @@ You can host it easily on **Hugging Face Spaces**:
 ### 📄 License
 
 MIT License © [Your Name]
-
-```
-
----
-
-Would you like me to also generate a **`requirements.txt`** and **`.gitignore`** file to complete your project’s structure?
-```
