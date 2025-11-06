@@ -12,11 +12,18 @@ def process_files(files):
         return "❗ Please upload at least one file."
     paths = []
     for f in files:
-        suffix = "." + f.name.split(".")[-1]
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tmp.write(f.read())
-        tmp.close()
-        paths.append(tmp.name)
+        # In newer Gradio versions, f is already a file path (string)
+        # not a file object
+        if isinstance(f, str):
+            # f is already a path to the uploaded file
+            paths.append(f)
+        else:
+            # Fallback for older Gradio versions or file objects
+            suffix = "." + f.name.split(".")[-1]
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+            tmp.write(f.read())
+            tmp.close()
+            paths.append(tmp.name)
 
     store, _ = ingest_documents(paths)
     return f"✅ Indexed {len(store.metadatas)} text chunks. You can now enter a query."
