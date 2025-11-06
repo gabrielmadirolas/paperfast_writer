@@ -3,11 +3,8 @@ import os
 from dotenv import load_dotenv
 import numpy as np
 import faiss
-try:
-    import pymupdf
-except ImportError:
-    import fitz as pymupdf
-import docx
+from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_community.document_loaders import Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from huggingface_hub import InferenceClient
 from typing import List, Tuple
@@ -27,25 +24,41 @@ gen_client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
 
 # -------- File Readers --------
 def extract_text_from_pdf(path: str) -> str:
-    """Extract text from a PDF file using PyMuPDF (new or legacy import)."""
-    text = []
-    with pymupdf.open(path) as pdf:
-        for page in pdf:
-            page_text = page.get_text("text")
-            if page_text:
-                text.append(page_text)
-    return "\n".join(text)
+    """Extract text from PDF using LangChain’s PyMuPDFLoader."""
+    loader = PyMuPDFLoader(path)
+    docs = loader.load()
+    return "\n".join([doc.page_content for doc in docs])
 
 def extract_text_from_docx(path: str) -> str:
-    doc = docx.Document(path)
-    return "\n".join([p.text for p in doc.paragraphs if p.text])
+    """Extract text from DOCX using LangChain’s Docx2txtLoader."""
+    loader = Docx2txtLoader(path)
+    docs = loader.load()
+    return "\n".join([doc.page_content for doc in docs])
+
+def extract_text_from_doc(path: str) -> str:
+    """Extract text from legacy DOC files using textract."""
+    try:
+        text = textract.process(path).decode("utf-8", errors="ignore")
+    except Exception as e:
+        raise RuntimeError(f"Failed to read .doc file '{path}': {e}")
+    return text
+
+def extract_text_from_txt(path: str) -> str:
+    """Extract text from plain TXT files."""
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        return f.read()
 
 def extract_text(path: str) -> str:
-    ext = path.lower().split(".")[-1]
-    if ext == "pdf":
+    """Auto-select extraction method based on file extension."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".pdf":
         return extract_text_from_pdf(path)
-    elif ext in ("docx", "doc"):
+    elif ext == ".docx":
         return extract_text_from_docx(path)
+    elif ext == ".doc":
+        return extract_text_from_doc(path)
+    elif ext == ".txt":
+        return extract_text_from_txt(path)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 

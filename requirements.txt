@@ -3,13 +3,15 @@
 
 # Core logic
 numpy
+langchain-community
 faiss-cpu
-langchain_text_splitters==1.0.0
 huggingface_hub
 
 # File parsing
+langchain_text_splitters==1.0.0
 pymupdf
-python-docx
+docx2txt
+textract
 
 # Web interface
 gradio
