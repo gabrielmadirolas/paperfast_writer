@@ -17,7 +17,7 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-GEN_MODEL = "google/flan-t5-large"
+GEN_MODEL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
 
 # -------- Hugging Face Clients --------
 embed_client = InferenceClient(model=EMBED_MODEL, token=HF_TOKEN)
@@ -88,10 +88,6 @@ def embed_texts(texts: List[str]) -> List[np.ndarray]:
             raise RuntimeError(f"Unexpected embedding response: {type(resp)}, value: {resp}")
         
         vectors.append(vec)
-    
-    print("Gab. len(vectors):", len(vectors))
-    if len(vectors) > 0:
-        print("Gab. vectors[0].shape:", vectors[0].shape)
     return vectors
 
 class VectorStore:
@@ -152,12 +148,71 @@ If information is missing, write 'not present in notes' instead of inventing it.
 ### ESSAY
 """
 
-def generate_essay(prompt: str) -> str:
-    try:
-        resp = gen_client.text_generation(
-            prompt=prompt,
-            max_new_tokens=600
-        )
-        return resp
-    except Exception as e:
-        return f"Error generating essay: {str(e)}\n\nPlease try again or use a different model."
+import requests
+import time
+
+def generate_essay(prompt: str, max_retries: int = 3) -> str:
+    """Generate essay using the new Hugging Face router endpoint."""
+    API_URL = f"https://router.huggingface.co/hf-inference/models/{GEN_MODEL}"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 600,
+            "temperature": 0.7,
+        }
+    }
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+            
+            # Debug: print status and response
+            print(f"Status code: {response.status_code}")
+            print(f"Response text: {response.text[:500]}")  # First 500 chars
+            
+            # Check status code first
+            if response.status_code == 503:
+                return "Model is currently unavailable (503). Please try again later."
+            elif response.status_code == 401:
+                return "Authentication failed. Please check your HF_API_TOKEN."
+            elif response.status_code != 200:
+                return f"API returned status {response.status_code}: {response.text[:200]}"
+            
+            # Try to parse JSON
+            result = response.json()
+            
+            # Check if model is loading
+            if isinstance(result, dict) and "error" in result:
+                if "loading" in result.get("error", "").lower():
+                    wait_time = result.get("estimated_time", 20)
+                    if attempt < max_retries - 1:
+                        print(f"Model loading... waiting {wait_time}s")
+                        time.sleep(wait_time)
+                        continue
+                else:
+                    return f"API Error: {result.get('error', result)}"
+            
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get("generated_text", str(result))
+            elif isinstance(result, dict):
+                return result.get("generated_text", str(result))
+            else:
+                return str(result)
+                
+        except requests.exceptions.JSONDecodeError as e:
+            print(f"JSON decode error on attempt {attempt + 1}: {e}")
+            print(f"Response content: {response.text[:500]}")
+            if attempt < max_retries - 1:
+                time.sleep(5)
+            else:
+                return f"Invalid API response after {max_retries} attempts. Response was: {response.text[:200]}"
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(5)
+            else:
+                return f"Failed after {max_retries} attempts: {str(e)}"
+    
+    return "Failed to generate essay after multiple attempts."
