@@ -17,11 +17,13 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-GEN_MODEL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+GEN_MODEL = "HuggingFaceTB/SmolLM3-3B"
+#GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct:scaleway"
 
 # -------- Hugging Face Clients --------
 embed_client = InferenceClient(model=EMBED_MODEL, token=HF_TOKEN)
-gen_client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
+# Don't create gen_client here since we'll create it in the function
+# gen_client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
 
 # -------- Document Loaders --------
 def extract_text_from_pdf(path: str) -> str:
@@ -68,7 +70,9 @@ def chunk_text(text: str, chunk_size: int = 500, chunk_overlap: int = 100) -> Li
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
-        separators=["\n\n", "\n", ".", " "], # Add "" character if I later decide to support OCR’d PDFs or non-English text without spaces
+        length_function=len,
+        # Warning: specifying the separators affects and even destroys chunk overlap
+        # separators=["\n\n", "\n", ".", " "], # Add "" character if I later decide to support OCR’d PDFs or non-English text without spaces
     )
     return splitter.split_text(text)
 
@@ -124,11 +128,13 @@ def ingest_documents(paths: List[str]) -> Tuple[VectorStore, int]:
     dim = vectors[0].shape[0]
     store = VectorStore(dim)
     store.add(vectors, metas)
+    #print(store) # delete comment
     return store, dim
 
 def retrieve_relevant(store: VectorStore, query: str, k: int = 5):
     qvec = embed_texts([query])[0]
     hits = store.search(qvec, k)
+    #print(hits) # delete comment
     context = "\n\n---\n\n".join([h[1]["text"] for h in hits])
     return context, hits
 
@@ -149,70 +155,120 @@ If information is missing, write 'not present in notes' instead of inventing it.
 """
 
 import requests
-import time
+import json
 
-def generate_essay(prompt: str, max_retries: int = 3) -> str:
-    """Generate essay using the new Hugging Face router endpoint."""
-    API_URL = f"https://router.huggingface.co/hf-inference/models/{GEN_MODEL}"
+def generate_essay(prompt: str) -> str:
+    """Generate essay using direct API call."""
+    # Use Hugging Face's serverless inference API
+    API_URL = f"https://router.huggingface.co/hf-inference/{GEN_MODEL}"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     
     payload = {
         "inputs": prompt,
         "parameters": {
-            "max_new_tokens": 600,
-            "temperature": 0.7,
+            "max_new_tokens": 500,
+            "temperature": 0.9,
+            "do_sample": True,
+            "return_full_text": False
+        },
+        "options": {
+            "wait_for_model": True  # Wait if model is loading
         }
     }
     
-    for attempt in range(max_retries):
+    try:
+        # Gab: delete from here
+        r = requests.get(f"https://huggingface.co/api/models/{GEN_MODEL}")
+        info = r.json()
+        print(info.get("inference", "No inference API available"))
+        # Gab: delete to here
+        print(f"Calling API for model: {GEN_MODEL}")
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+        print(f"Status code: {response.status_code}")
+        
+        if response.status_code == 503:
+            # Model is loading, wait and retry
+            print("Model is loading, waiting 20 seconds...")
+            import time
+            time.sleep(20)
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+        if response.status_code != 200:
+            print(f"Error response: {response.text}")
+            return f"API Error (status {response.status_code}): {response.text}"
+        
+        result = response.json()
+        print(f"Result type: {type(result)}")
+        print(f"Result: {result}")
+        
+        # Parse the response
+        if isinstance(result, list) and len(result) > 0:
+            generated = result[0].get("generated_text", "")
+            return generated if generated else str(result)
+        elif isinstance(result, dict):
+            if "error" in result:
+                return f"API Error: {result['error']}"
+            return result.get("generated_text", str(result))
+        else:
+            return str(result)
+            
+    except requests.exceptions.Timeout:
+        return "Request timed out. Please try again."
+    except requests.exceptions.RequestException as e:
+        return f"Network error: {str(e)}"
+    except Exception as e:
+        import traceback
+        print(f"Unexpected error: {type(e).__name__}: {str(e)}")
+        traceback.print_exc()
+        return f"Error: {type(e).__name__}: {str(e)}"
+
+
+'''
+import requests
+import time
+
+def generate_essay(prompt: str) -> str:
+    """Generate essay using InferenceClient with configured model."""
+    try:
+        print(f"Attempting to use model: {GEN_MODEL}")
+        client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
+        
+        response = client.text_generation(
+            prompt,
+            max_new_tokens=500,
+            temperature=0.9,
+            do_sample=True
+        )
+        
+        print(f"Success! Response type: {type(response)}")
+        return response
+        
+    except Exception as e:
+        print(f"Generation error with {GEN_MODEL}: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # Fallback to base GPT-2
         try:
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+            print("Trying fallback model: openai-community/gpt2")
+            fallback_client = InferenceClient(model="openai-community/gpt2", token=HF_TOKEN)
+            response = fallback_client.text_generation(
+                prompt,
+                max_new_tokens=400,
+            )
+            print(f"Fallback success! Response type: {type(response)}")
+            return response
+        except Exception as e2:
+            print(f"Fallback error: {type(e2).__name__}: {str(e2)}")
+            import traceback
+            traceback.print_exc()
             
-            # Debug: print status and response
-            print(f"Status code: {response.status_code}")
-            print(f"Response text: {response.text[:500]}")  # First 500 chars
-            
-            # Check status code first
-            if response.status_code == 503:
-                return "Model is currently unavailable (503). Please try again later."
-            elif response.status_code == 401:
-                return "Authentication failed. Please check your HF_API_TOKEN."
-            elif response.status_code != 200:
-                return f"API returned status {response.status_code}: {response.text[:200]}"
-            
-            # Try to parse JSON
-            result = response.json()
-            
-            # Check if model is loading
-            if isinstance(result, dict) and "error" in result:
-                if "loading" in result.get("error", "").lower():
-                    wait_time = result.get("estimated_time", 20)
-                    if attempt < max_retries - 1:
-                        print(f"Model loading... waiting {wait_time}s")
-                        time.sleep(wait_time)
-                        continue
-                else:
-                    return f"API Error: {result.get('error', result)}"
-            
-            if isinstance(result, list) and len(result) > 0:
-                return result[0].get("generated_text", str(result))
-            elif isinstance(result, dict):
-                return result.get("generated_text", str(result))
-            else:
-                return str(result)
-                
-        except requests.exceptions.JSONDecodeError as e:
-            print(f"JSON decode error on attempt {attempt + 1}: {e}")
-            print(f"Response content: {response.text[:500]}")
-            if attempt < max_retries - 1:
-                time.sleep(5)
-            else:
-                return f"Invalid API response after {max_retries} attempts. Response was: {response.text[:200]}"
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                time.sleep(5)
-            else:
-                return f"Failed after {max_retries} attempts: {str(e)}"
-    
-    return "Failed to generate essay after multiple attempts."
+            return f"""Error: Unable to generate essay using Hugging Face API.
+
+Primary model ({GEN_MODEL}) error: {type(e).__name__}: {str(e)}
+Fallback model error: {type(e2).__name__}: {str(e2)}
+
+Please check:
+1. Your HF_API_TOKEN is valid
+2. The Hugging Face API is accessible
+3. Try again in a few minutes"""
+'''
