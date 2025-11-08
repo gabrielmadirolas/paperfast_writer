@@ -1,3 +1,4 @@
 .env
 pfw_env/
 __pycache__/
+generated_texts

@@ -17,7 +17,9 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-GEN_MODEL = "HuggingFaceTB/SmolLM3-3B"
+# GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # This one works, but only with chat_completion()
+# GEN_MODEL = "moonshotai/Kimi-K2-Thinking" # This one works, but only with chat_completion()
+GEN_MODEL = "katanemo/Arch-Router-1.5B"
 #GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct:scaleway"
 
 # -------- Hugging Face Clients --------
@@ -158,68 +160,67 @@ import requests
 import json
 
 def generate_essay(prompt: str) -> str:
-    """Generate essay using direct API call."""
-    # Use Hugging Face's serverless inference API
-    API_URL = f"https://router.huggingface.co/hf-inference/{GEN_MODEL}"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 500,
-            "temperature": 0.9,
-            "do_sample": True,
-            "return_full_text": False
-        },
-        "options": {
-            "wait_for_model": True  # Wait if model is loading
-        }
-    }
-    
+    """Generate essay using Hugging Face InferenceClient."""
     try:
-        # Gab: delete from here
-        r = requests.get(f"https://huggingface.co/api/models/{GEN_MODEL}")
-        info = r.json()
-        print(info.get("inference", "No inference API available"))
-        # Gab: delete to here
-        print(f"Calling API for model: {GEN_MODEL}")
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
-        print(f"Status code: {response.status_code}")
+        client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
         
-        if response.status_code == 503:
-            # Model is loading, wait and retry
-            print("Model is loading, waiting 20 seconds...")
-            import time
-            time.sleep(20)
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
-        if response.status_code != 200:
-            print(f"Error response: {response.text}")
-            return f"API Error (status {response.status_code}): {response.text}"
+        # First try text_generation (for base/completion models)
+        print(f"Attempting text_generation with model: {GEN_MODEL}")
+        response = client.text_generation(
+            prompt=prompt,
+            max_new_tokens=2000,
+            temperature=0.7,
+            return_full_text=False
+        )
         
-        result = response.json()
-        print(f"Result type: {type(result)}")
-        print(f"Result: {result}")
-        
-        # Parse the response
-        if isinstance(result, list) and len(result) > 0:
-            generated = result[0].get("generated_text", "")
-            return generated if generated else str(result)
-        elif isinstance(result, dict):
-            if "error" in result:
-                return f"API Error: {result['error']}"
-            return result.get("generated_text", str(result))
-        else:
-            return str(result)
+        print(f"Text generation successful!")
+        print("Generated text:", response)
+        return response
             
-    except requests.exceptions.Timeout:
-        return "Request timed out. Please try again."
-    except requests.exceptions.RequestException as e:
-        return f"Network error: {str(e)}"
     except Exception as e:
-        import traceback
-        print(f"Unexpected error: {type(e).__name__}: {str(e)}")
-        traceback.print_exc()
-        return f"Error: {type(e).__name__}: {str(e)}"
+        print(f"Text generation failed: {type(e).__name__}: {str(e)}")
+        
+        # Fallback to chat_completion for instruction-tuned models
+        try:
+            print(f"Trying chat_completion with model: {GEN_MODEL}")
+            client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
+            
+            messages = [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            response = client.chat_completion(
+                messages=messages,
+                max_tokens=2000,
+                temperature=0.7
+            )
+            
+            # Extract the generated text
+            if hasattr(response, 'choices') and len(response.choices) > 0:
+                print(f"Chat completion successful!")
+                print("Completed chat:", response)
+                return response.choices[0].message.content
+            else:
+                print("Completed chat:", response)
+                return str(response)
+                
+        except Exception as e2:
+            print(f"Chat completion also failed: {type(e2).__name__}: {str(e2)}")
+            import traceback
+            traceback.print_exc()
+            
+            return f"""Unable to generate essay using Hugging Face API.
+
+Tried both text_generation and chat_completion.
+
+Errors:
+- Text generation: {type(e).__name__}: {str(e)}
+- Chat completion: {type(e2).__name__}: {str(e2)}
+
+The model '{GEN_MODEL}' may not support either method with the Inference API."""
 
 
 '''
