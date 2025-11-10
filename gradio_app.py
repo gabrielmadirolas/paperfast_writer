@@ -32,11 +32,32 @@ def generate_paper(query):
     global store
     if store is None:
         return "❗ Please upload and process your notes first."
-    context, hits = retrieve_relevant(store, query, k=6)
-    prompt = build_prompt(context, query)
-    essay = generate_essay(prompt)
-    refs = "\n".join([f"- {h[1]['source']} (chunk {h[1]['chunk']}, score={h[0]:.3f})" for h in hits])
-    return f"### 📄 Generated Academic Paper\n{essay}\n\n---\n### 🔎 Sources Used\n{refs}"
+    
+    try:
+        context, hits = retrieve_relevant(store, query, k=6)
+        prompt = build_prompt(context, query)
+        essay = generate_essay(prompt)
+        
+        # Debug: check what we got back
+        print(f"Essay type: {type(essay)}")
+        print(f"Essay length: {len(essay) if essay else 0}")
+        print(f"Essay preview: {essay[:200] if essay else 'EMPTY'}")
+        
+        # Ensure essay is not empty
+        if not essay or essay.strip() == "":
+            return "❗ Generated essay is empty. Please try again with a different model or query."
+        
+        refs = "\n".join([f"- {h[1]['source']} (chunk {h[1]['chunk']}, score={h[0]:.3f})" for h in hits])
+        
+        result = f"### 📄 Generated Academic Paper\n\n{essay}\n\n---\n\n### 🔎 Sources Used\n{refs}"
+        print(f"Final result length: {len(result)}")
+        return result
+        
+    except Exception as e:
+        print(f"Error in generate_paper: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return f"Error generating paper: {str(e)}"
 
 with gr.Blocks(theme="soft") as app:
     gr.Markdown("## 🧠 Academic Paper Chatbot — RAG + Hugging Face API")
