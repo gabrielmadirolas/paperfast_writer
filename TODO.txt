@@ -1,0 +1,6 @@
+- Allow usage of local model
+- Create file with generated text
+- Remove emojis
+- Admit all possible formats for generated response (the raw LLM response)
+- Explore other inference methods
+- Comment the usage of FAISS

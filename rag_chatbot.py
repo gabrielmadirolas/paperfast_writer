@@ -17,9 +17,9 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-# GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # This one works, but only with chat_completion()
+GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # This one works, but only with chat_completion()
 # GEN_MODEL = "moonshotai/Kimi-K2-Thinking" # This one works, but only with chat_completion()
-GEN_MODEL = "katanemo/Arch-Router-1.5B"
+# GEN_MODEL = "katanemo/Arch-Router-1.5B"
 #GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct:scaleway"
 
 # -------- Hugging Face Clients --------
@@ -155,9 +155,6 @@ If information is missing, write 'not present in notes' instead of inventing it.
 
 ### ESSAY
 """
-
-import requests
-import json
 
 def generate_essay(prompt: str) -> str:
     """Generate essay using Hugging Face InferenceClient."""
