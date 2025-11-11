@@ -171,9 +171,10 @@ def generate_essay(prompt: str) -> str:
         completion = client.chat.completions.create(
             model=GEN_MODEL,
             messages=[
+                {"role": "system", "content": "/no_think"},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=2000,
+            max_tokens=2500,
             temperature=0.7
         )
         
@@ -212,16 +213,14 @@ def generate_essay(prompt: str) -> str:
             client = InferenceClient(token=HF_TOKEN)
             
             messages = [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "system", "content": "/no_think"},
+                {"role": "user", "content": prompt}
             ]
             
             response = client.chat_completion(
                 messages=messages,
                 model=GEN_MODEL,
-                max_tokens=2000,
+                max_tokens=2500,
                 temperature=0.7
             )
             

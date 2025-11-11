@@ -1,3 +1,4 @@
+- Add to requirements.txt the foolowing packages (once confirmed that file generation works): python-docx fpdf markdown
 - Check whether I can save token length by not returning COT of the model
 - Why the interface sometimes do not process documents, depending on my desktop activity?
 - Allow usage of local model
