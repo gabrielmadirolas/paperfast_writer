@@ -13,7 +13,7 @@ This project combines document parsing, vector similarity search, and large lang
 - **Context-aware generation**: RAG pipeline ensures responses grounded in your documents
 - **Source attribution**: Tracks which document chunks informed the generated content
 - **Export options**: Download papers in TXT, DOCX, PDF, or Markdown
-- **Free & open**: Uses Hugging Face's free inference API
+- **Open-source models**: Uses Hugging Face Inference API
 
 ## 🛠️ Technology Stack
 
@@ -23,6 +23,7 @@ This project combines document parsing, vector similarity search, and large lang
 | **Vector Database** | FAISS | Fast similarity search with cosine distance |
 | **Embeddings** | sentence-transformers/all-MiniLM-L6-v2 | Text vectorization (384-dim) |
 | **LLM** | HuggingFaceTB/SmolLM3-3B | Academic text generation |
+| **LLM Provider** | Hugging Face Inference API | Text generation (requires paid plan for regular use) |
 | **Document Parsing** | PyMuPDF, python-docx, textract | Multi-format file extraction |
 | **Interface** | Gradio | Interactive web UI |
 | **Language** | Python 3.12+ | Core implementation |
@@ -45,8 +46,9 @@ Create a `.env` file in the project root:
 ```bash
 HF_API_TOKEN=your_huggingface_token_here
 ```
+**Note**: You'll need a [Hugging Face paid plan](https://huggingface.co/pricing) for sufficient inference quota. The free tier has limited requests per day.
 
-Get a free token at [Hugging Face](https://huggingface.co/settings/tokens).
+Get your token at [Hugging Face Settings](https://huggingface.co/settings/tokens).
 
 ### 4. Run the Application
 ```bash
@@ -192,7 +194,7 @@ MIT License - see LICENSE file for details
 
 ## 🙏 Acknowledgments
 
-- [Hugging Face](https://huggingface.co) for free inference API
+- [Hugging Face](https://huggingface.co) for their inference API and model hosting
 - [LangChain](https://langchain.com) for document processing utilities
 - [FAISS](https://github.com/facebookresearch/faiss) for efficient similarity search
 - [Gradio](https://gradio.app) for rapid UI prototyping
