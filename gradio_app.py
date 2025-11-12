@@ -133,47 +133,41 @@ def export_paper(format_choice):
         filename = f"paper_{timestamp}.pdf"
         filepath = os.path.join(tempfile.gettempdir(), filename)
         
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        
         pdf = FPDF()
         pdf.add_page()
         pdf.set_auto_page_break(auto=True, margin=15)
         
         # Title
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 10, 'Generated Academic Paper', 0, 1, 'C')
+        pdf.set_font("Helvetica", 'B', 16)
+        pdf.cell(0, 10, 'Generated Academic Paper', align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(10)
         
         # Essay content
-        pdf.set_font("Arial", '', 11)
+        pdf.set_font("Helvetica", '', 11)
         
-        # Clean and process text for PDF
+        # Clean markdown formatting for PDF
         clean_essay = last_essay.replace('**', '').replace('###', '').replace('##', '')
         
         # Split into lines and add to PDF
         for line in clean_essay.split('\n'):
             if line.strip():
-                # Handle encoding issues
-                try:
-                    pdf.multi_cell(0, 6, line.strip())
-                except UnicodeEncodeError:
-                    # Fallback for special characters
-                    clean_line = line.encode('latin-1', 'replace').decode('latin-1')
-                    pdf.multi_cell(0, 6, clean_line.strip())
+                # fpdf2 handles Unicode natively
+                pdf.multi_cell(0, 6, line.strip())
                 pdf.ln(2)
         
         # Sources section
         pdf.add_page()
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 10, 'Sources Used', 0, 1)
+        pdf.set_font("Helvetica", 'B', 14)
+        pdf.cell(0, 10, 'Sources Used', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(5)
         
-        pdf.set_font("Arial", '', 10)
+        pdf.set_font("Helvetica", '', 10)
         for ref in last_refs.split('\n'):
             if ref.strip():
-                try:
-                    pdf.multi_cell(0, 5, ref.strip())
-                except UnicodeEncodeError:
-                    clean_ref = ref.encode('latin-1', 'replace').decode('latin-1')
-                    pdf.multi_cell(0, 5, clean_ref.strip())
+                pdf.multi_cell(0, 5, ref.strip())
                 pdf.ln(2)
         
         pdf.output(filepath)
@@ -218,7 +212,7 @@ with gr.Blocks(theme="soft") as app:
     export_btn.click(export_paper, inputs=[format_dropdown], outputs=[download_file])
 
     gr.Markdown("---")
-    gr.Markdown("⚙️ Powered by Hugging Face Free API · Built with LangChain, FAISS & Gradio.")
+    gr.Markdown("⚙️ Powered by Hugging Face Inference API · Built with LangChain, FAISS & Gradio.")
 
 if __name__ == "__main__":
     app.launch()
