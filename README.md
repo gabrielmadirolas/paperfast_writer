@@ -32,8 +32,8 @@ This project combines document parsing, vector similarity search, and large lang
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/academic-paper-rag.git
-cd academic-paper-rag
+git clone https://github.com/gabrielmadirolas/paperfast_writer.git
+cd paperfast_writer
 ```
 
 ### 2. Install Dependencies
