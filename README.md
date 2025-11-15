@@ -31,9 +31,24 @@ This project combines document parsing, vector similarity search, and large lang
 ## 🚀 Installation & Setup
 
 ### 1. Clone the Repository
+### 1. Clone the Repository
+
+**HTTPS:**
 ```bash
 git clone https://github.com/gabrielmadirolas/paperfast_writer.git
-cd paperfast_writer
+cd academic-paper-rag
+```
+
+**SSH:**
+```bash
+git clone git@github.com:gabrielmadirolas/paperfast_writer.git
+cd academic-paper-rag
+```
+
+**GitHub CLI:**
+```bash
+gh repo clone gabrielmadirolas/paperfast_writer
+cd academic-paper-rag
 ```
 
 ### 2. Install Dependencies
@@ -128,8 +143,8 @@ The interface will launch at `http://localhost:7860`
 ### Local Deployment with Docker
 
 ```bash
-docker build -t academic-paper-rag .
-docker run -p 7860:7860 -e HF_API_TOKEN=your_token academic-paper-rag
+docker build -t paperfast_writer .
+docker run -p 7860:7860 -e HF_API_TOKEN=your_token paperfast_writer
 ```
 
 ## 🔧 Configuration
