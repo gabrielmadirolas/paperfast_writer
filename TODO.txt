@@ -1,6 +1,8 @@
-- Add to requirements.txt the folowing packages (once confirmed that file generation works): python-docx fpdf markdown
+- Add the option to include/exclude thinking in the output. Also to force the model not to reason (or decide how much?)
 - Look in the code for other imports that may require package installation in the venv
-- Specify package versions in requirements.txt
+- Include fallback models (HuggingFaceTB/SmolLM3-3B for instance)
+- Consider easy customizing (llm model choice and parameters), probably in the Gradio interface.
+- Can I remove the Ctrl + click in terminal to start the interface, and leave only click?
 - Check whether I can save token length by not returning COT of the model
 - Why the interface sometimes do not process documents, depending on my desktop activity?
 - Allow usage of local model. For example with OLLAMA. But make sure that the default model is lightweight so it can fit in no-GPU machines with, say, 16GB RAM.

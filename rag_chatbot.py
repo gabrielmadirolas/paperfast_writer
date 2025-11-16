@@ -17,11 +17,9 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # This one works, but only with chat_completion()
-# GEN_MODEL = "moonshotai/Kimi-K2-Thinking" # This one works, but only with chat_completion()
-# GEN_MODEL = "Qwen/Qwen3-4B-Thinking-2507" # This one works, but only with chat_completion()
-# GEN_MODEL = "katanemo/Arch-Router-1.5B" # This one does not work
-# GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct:scaleway" # This one does not work
+# GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # To be fallback model.
+# GEN_MODEL = "Qwen/Qwen2.5-32B-Instruct" # Does not work. It says that it has none of my allowed inference providers. Check later whether this continues
+GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 
 # -------- Hugging Face Clients --------
 embed_client = InferenceClient(model=EMBED_MODEL, token=HF_TOKEN)
@@ -161,11 +159,12 @@ If information is missing, write 'not present in notes' instead of inventing it.
 # chat.completions version
 
 def generate_essay(prompt: str) -> str:
-    """Generate essay using Hugging Face InferenceClient with OpenAI-compatible API."""
+    """Generate essay using Hugging Face InferenceClient with multiple fallback methods."""
+    
+    # Method 1: Try chat.completions.create (OpenAI-compatible, preferred)
     try:
         client = InferenceClient(token=HF_TOKEN)
         
-        # Use the new OpenAI-compatible API (preferred method)
         print(f"Attempting chat.completions.create with model: {GEN_MODEL}")
         
         completion = client.chat.completions.create(
@@ -180,78 +179,98 @@ def generate_essay(prompt: str) -> str:
         
         # Extract the generated text
         generated_text = completion.choices[0].message.content
-        print(f"Chat completions successful!")
+        print(f"chat.completions.create successful!")
         print(f"Generated {len(generated_text)} characters")
         
         # Handle thinking models - remove <think>...</think> tags
         import re
-        # Remove thinking tags and their content
         cleaned_text = re.sub(r'<think>.*?</think>', '', generated_text, flags=re.DOTALL)
-        # Also try removing if they're not closed properly
         cleaned_text = re.sub(r'<think>.*', '', cleaned_text, flags=re.DOTALL)
         cleaned_text = cleaned_text.strip()
         
         print(f"After cleaning: {len(cleaned_text)} characters")
-        print(f"Cleaned preview: {cleaned_text[:200]}")
         
-        # If cleaning removed everything, return original
+        # If cleaning removed everything, return original with escaped HTML
         if not cleaned_text:
             print("Warning: Cleaning removed all text, returning original")
-            # Escape HTML tags so they display
             return generated_text.replace('<', '&lt;').replace('>', '&gt;')
         
         return cleaned_text
             
     except Exception as e:
         print(f"chat.completions.create failed: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
         
-        # Fallback to legacy chat_completion method
+        # Method 2: Try text_generation (for base/completion models)
         try:
-            print(f"Trying legacy chat_completion with model: {GEN_MODEL}")
+            print(f"Trying text_generation with model: {GEN_MODEL}")
             client = InferenceClient(token=HF_TOKEN)
             
-            messages = [
-                {"role": "system", "content": "/no_think"},
-                {"role": "user", "content": prompt}
-            ]
-            
-            response = client.chat_completion(
-                messages=messages,
+            response = client.text_generation(
+                prompt=prompt,
                 model=GEN_MODEL,
-                max_tokens=2500,
-                temperature=0.7
+                max_new_tokens=2500,
+                temperature=0.7,
+                return_full_text=False
             )
             
-            # Extract the generated text
-            if hasattr(response, 'choices') and len(response.choices) > 0:
-                print(f"Legacy chat_completion successful!")
-                generated_text = response.choices[0].message.content
-                
-                # Clean thinking tags here too
-                import re
-                cleaned_text = re.sub(r'<think>.*?</think>', '', generated_text, flags=re.DOTALL)
-                cleaned_text = re.sub(r'<think>.*', '', cleaned_text, flags=re.DOTALL)
-                cleaned_text = cleaned_text.strip()
-                
-                if not cleaned_text:
-                    return generated_text.replace('<', '&lt;').replace('>', '&gt;')
-                
-                return cleaned_text
-            else:
-                return str(response)
+            print(f"text_generation successful!")
+            print(f"Generated {len(response)} characters")
+            
+            return response
                 
         except Exception as e2:
-            print(f"Legacy chat_completion also failed: {type(e2).__name__}: {str(e2)}")
+            print(f"text_generation failed: {type(e2).__name__}: {str(e2)}")
             
-            return f"""Unable to generate essay using Hugging Face API.
+            # Method 3: Try legacy chat_completion (last resort)
+            try:
+                print(f"Trying legacy chat_completion with model: {GEN_MODEL}")
+                client = InferenceClient(token=HF_TOKEN)
+                
+                messages = [
+                    {"role": "system", "content": "/no_think"},
+                    {"role": "user", "content": prompt}
+                ]
+                
+                response = client.chat_completion(
+                    messages=messages,
+                    model=GEN_MODEL,
+                    max_tokens=2500,
+                    temperature=0.7
+                )
+                
+                # Extract the generated text
+                if hasattr(response, 'choices') and len(response.choices) > 0:
+                    print(f"Legacy chat_completion successful!")
+                    generated_text = response.choices[0].message.content
+                    
+                    # Clean thinking tags here too
+                    import re
+                    cleaned_text = re.sub(r'<think>.*?</think>', '', generated_text, flags=re.DOTALL)
+                    cleaned_text = re.sub(r'<think>.*', '', cleaned_text, flags=re.DOTALL)
+                    cleaned_text = cleaned_text.strip()
+                    
+                    if not cleaned_text:
+                        return generated_text.replace('<', '&lt;').replace('>', '&gt;')
+                    
+                    return cleaned_text
+                else:
+                    return str(response)
+                    
+            except Exception as e3:
+                print(f"All methods failed:")
+                print(f"1. chat.completions.create: {type(e).__name__}: {str(e)}")
+                print(f"2. text_generation: {type(e2).__name__}: {str(e2)}")
+                print(f"3. chat_completion: {type(e3).__name__}: {str(e3)}")
+                
+                return f"""Unable to generate essay using Hugging Face API.
 
-Errors:
-- chat.completions.create: {type(e).__name__}: {str(e)}
-- chat_completion: {type(e2).__name__}: {str(e2)}
+Tried all available methods:
+1. chat.completions.create: {type(e).__name__}
+2. text_generation: {type(e2).__name__}
+3. chat_completion: {type(e3).__name__}
 
-The model '{GEN_MODEL}' may not be compatible with the Inference API."""
+The model '{GEN_MODEL}' may not be compatible with your enabled inference providers.
+Check your Hugging Face Pro plan settings or try a different model."""
 
 
 # text_generation and chat_completion version

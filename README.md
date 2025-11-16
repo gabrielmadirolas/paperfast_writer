@@ -22,7 +22,7 @@ This project combines document parsing, vector similarity search, and large lang
 | **Framework** | LangChain | Document processing and RAG orchestration |
 | **Vector Database** | FAISS | Fast similarity search with cosine distance |
 | **Embeddings** | sentence-transformers/all-MiniLM-L6-v2 | Text vectorization (384-dim) |
-| **LLM** | HuggingFaceTB/SmolLM3-3B | Academic text generation |
+| **LLM** | meta-llama/Llama-3.3-70B-Instruct | Academic text generation |
 | **LLM Provider** | Hugging Face Inference API | Text generation (requires paid plan for regular use) |
 | **Document Parsing** | PyMuPDF, python-docx, textract | Multi-format file extraction |
 | **Interface** | Gradio | Interactive web UI |
@@ -30,7 +30,6 @@ This project combines document parsing, vector similarity search, and large lang
 
 ## 🚀 Installation & Setup
 
-### 1. Clone the Repository
 ### 1. Clone the Repository
 
 **HTTPS:**
@@ -156,7 +155,7 @@ Edit `rag_chatbot.py` to customize:
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # Change generation model
-GEN_MODEL = "HuggingFaceTB/SmolLM3-3B"
+GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 
 # Adjust chunking parameters
 chunk_size = 500      # Characters per chunk
