@@ -191,7 +191,7 @@ academic-paper-rag/
 ### Generation
 - **Method**: `chat.completions.create()` (OpenAI-compatible API)
 - **Post-processing**: Removes `<think>` tags from reasoning models
-- **Fallback**: Legacy `chat_completion()` method if needed
+- **Fallback**: Legacy `text_generation` & `chat_completion()` methods if needed
 
 ## 🤝 Contributing
 
