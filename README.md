@@ -24,7 +24,7 @@ This project combines document parsing, vector similarity search, and large lang
 | **Embeddings** | sentence-transformers/all-MiniLM-L6-v2 | Text vectorization (384-dim) |
 | **LLM** | meta-llama/Llama-3.3-70B-Instruct | Academic text generation |
 | **LLM Provider** | Hugging Face Inference API | Text generation (requires paid plan for regular use) |
-| **Document Parsing** | PyMuPDF, python-docx, textract | Multi-format file extraction |
+| **Document Parsing** | PyMuPDF, python-docx, odfpy, textract | Multi-format file extraction |
 | **Interface** | Gradio | Interactive web UI |
 | **Language** | Python 3.12+ | Core implementation |
 

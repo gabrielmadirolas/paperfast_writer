@@ -1,14 +1,14 @@
-- Why can't I upload more than one file?
+- Why can't I drop additional files once some files have already been dropped?
+- Consider easy customizing (llm model choice and parameters), probably in the Gradio interface.
 - Include a "developers" tab in the interface, for all the model selection, parameters, etc.
+- A cool feature for developers: Allow to load an already existing vector store, and update it with embedings from new notes.
 - Add the option to include/exclude thinking in the output. Also to force the model not to reason (or decide how much?)
 - Look in the code for other imports that may require package installation in the venv
 - Include fallback models (HuggingFaceTB/SmolLM3-3B for instance)
-- Consider easy customizing (llm model choice and parameters), probably in the Gradio interface.
 - Can I remove the Ctrl + click in terminal to start the interface, and leave only click?
 - Check whether I can save token length by not returning COT of the model
 - Why the interface sometimes do not process documents, depending on my desktop activity?
 - Allow usage of local model. For example with OLLAMA. But make sure that the default model is lightweight so it can fit in no-GPU machines with, say, 16GB RAM.
-- Create file with generated text
 - Remove emojis (at least in Gradio interface)
 - Admit all possible formats for generated response (the raw LLM response)
 - Explore inference methods other than InferenceClient.text_generation (nor working) or .chat_completion
