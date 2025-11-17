@@ -133,6 +133,24 @@ class VectorStore:
             results.append((float(score), self.metadatas[idx]))
         return results
 
+def add_documents_to_store(store: VectorStore, paths: List[str]) -> Tuple[int, int]:
+    """Add new documents to an existing vector store."""
+    all_chunks, metas = [], []
+    for path in paths:
+        text = extract_text(path)
+        chunks = chunk_text(text)
+        for i, c in enumerate(chunks):
+            all_chunks.append(c)
+            metas.append({"source": os.path.basename(path), "chunk": i, "text": c})
+    
+    if not all_chunks:
+        return 0, 0
+    
+    vectors = embed_texts(all_chunks)
+    store.add(vectors, metas)
+    
+    return len(all_chunks), len(paths)
+
 # -------- Pipeline Functions --------
 def ingest_documents(paths: List[str]) -> Tuple[VectorStore, int]:
     all_chunks, metas = [], []
