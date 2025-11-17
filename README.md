@@ -8,7 +8,7 @@ This project combines document parsing, vector similarity search, and large lang
 
 ## ✨ Key Features
 
-- **Multi-format document ingestion**: PDF, DOCX, DOC, and TXT
+- **Multi-format document ingestion**: PDF, DOCX, DOC, ODT and TXT
 - **Semantic search**: FAISS-powered vector similarity matching
 - **Context-aware generation**: RAG pipeline ensures responses grounded in your documents
 - **Source attribution**: Tracks which document chunks informed the generated content
@@ -73,7 +73,7 @@ The interface will launch at `http://localhost:7860`
 
 ## 📝 Usage
 
-1. **Upload Documents**: Click "📂 Upload your notes" and select PDF, DOCX, DOC, or TXT files
+1. **Upload Documents**: Click "📂 Upload your notes" and select PDF, DOCX, DOC, ODT, or TXT files
 2. **Process**: Click "Embed & Process" to index your documents (creates vector embeddings)
 3. **Query**: Enter your research question or essay prompt
 4. **Generate**: Click "🧩 Generate Paper" to produce an academic paper

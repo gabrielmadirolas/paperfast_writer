@@ -186,7 +186,7 @@ def export_paper(format_choice):
 
 with gr.Blocks(theme="soft") as app:
     gr.Markdown("## 🧠 Academic Paper Chatbot — RAG + Hugging Face API")
-    gr.Markdown("Upload your personal notes (PDF/DOC/DOCX), ask a question, and generate an academic paper draft.")
+    gr.Markdown("Upload your personal notes (PDF/DOCX/DOC/ODT/TXT), ask a question, and generate an academic paper draft.")
 
     file_uploader = gr.File(file_count="multiple", label="📂 Upload your notes")
     upload_btn = gr.Button("Embed & Process")

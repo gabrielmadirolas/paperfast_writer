@@ -5,6 +5,8 @@ import numpy as np
 import faiss
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.document_loaders import Docx2txtLoader
+from odf import text, teletype
+from odf.opendocument import load
 import textract
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from huggingface_hub import InferenceClient
@@ -47,6 +49,20 @@ def extract_text_from_doc(path: str) -> str:
         raise RuntimeError(f"Failed to read .doc file '{path}': {e}")
     return text
 
+def extract_text_from_odt(path: str) -> str:
+    """Extract text from ODT files using odfpy."""
+    try:  
+        doc = load(path)
+        all_paragraphs = doc.getElementsByType(text.P)
+        text_content = []
+        
+        for paragraph in all_paragraphs:
+            text_content.append(teletype.extractText(paragraph))
+        
+        return "\n".join(text_content)
+    except Exception as e:
+        raise RuntimeError(f"Failed to read .odt file '{path}': {e}")
+
 def extract_text_from_txt(path: str) -> str:
     """Extract text from plain TXT files."""
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -61,6 +77,8 @@ def extract_text(path: str) -> str:
         return extract_text_from_docx(path)
     elif ext == ".doc":
         return extract_text_from_doc(path)
+    elif ext == ".odt":
+        return extract_text_from_odt(path)
     elif ext == ".txt":
         return extract_text_from_txt(path)
     else:

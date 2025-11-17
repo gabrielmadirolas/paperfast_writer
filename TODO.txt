@@ -1,3 +1,5 @@
+- Why can't I upload more than one file?
+- Include a "developers" tab in the interface, for all the model selection, parameters, etc.
 - Add the option to include/exclude thinking in the output. Also to force the model not to reason (or decide how much?)
 - Look in the code for other imports that may require package installation in the venv
 - Include fallback models (HuggingFaceTB/SmolLM3-3B for instance)
