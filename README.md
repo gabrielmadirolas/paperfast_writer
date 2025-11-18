@@ -126,26 +126,6 @@ The interface will launch at `http://localhost:7860`
                           └──────────────┘
 ```
 
-## 🌐 Deployment
-
-### Hugging Face Spaces
-
-1. Create a new [Hugging Face Space](https://huggingface.co/spaces)
-2. Select **Gradio** as the SDK
-3. Upload all project files
-4. Rename `gradio_app.py` → `app.py`
-5. Add your token in **Settings → Repository Secrets**:
-   - Key: `HF_API_TOKEN`
-   - Value: `your_token_here`
-6. The space will automatically deploy
-
-### Local Deployment with Docker
-
-```bash
-docker build -t paperfast_writer .
-docker run -p 7860:7860 -e HF_API_TOKEN=your_token paperfast_writer
-```
-
 ## 🔧 Configuration
 
 Edit `rag_chatbot.py` to customize:
