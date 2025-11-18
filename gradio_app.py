@@ -1,9 +1,9 @@
 # gradio_app.py
-import gradio as gr
-import tempfile
-import os
+import gradio as gr, os, shutil, tempfile
 from datetime import datetime
-from rag_chatbot02 import ingest_documents, retrieve_relevant, build_prompt, generate_essay, add_documents_to_store
+from typing import Tuple, List
+from rag_chatbot import (ingest_documents, retrieve_relevant, build_prompt,
+                         generate_essay, add_documents_to_store)
 
 # For file export
 from docx import Document
@@ -11,10 +11,23 @@ from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
+# ----------  NEW  ----------
+PendingEntry = Tuple[str, str]          # (real_name, temp_path)
+pending_files = gr.State()
+pending_files.value: List[PendingEntry] = []   # list of absolute paths not yet indexed 
+
+# ----------  EXISTING GLOBALS  ----------
 store = None
-stored_files = []  # List of (filename, filepath) tuples
+stored_files = []          # list of (filename, filepath) tuples already in store
 last_essay = None
 last_refs = None
+
+def _save_upload(gradio_path: str) -> str:
+    """Keep a permanent copy of the file Gradio already saved for us."""
+    permanent = tempfile.NamedTemporaryFile(delete=False,
+                                          suffix=os.path.splitext(gradio_path)[1])
+    shutil.copy2(gradio_path, permanent.name)
+    return permanent.name
 
 def save_uploaded_files(files):
     """Save uploaded files and return their paths."""
@@ -40,35 +53,52 @@ def save_uploaded_files(files):
     
     return paths
 
-def process_files(files):
-    """Add uploaded files to the vector store."""
-    global store, stored_files
-    
-    if not files:
-        return format_file_list(stored_files), "❗ Please upload at least one file.", None  # Added None for clearing
-    
-    # Save uploaded files
-    new_files = save_uploaded_files(files)
-    file_paths = [path for _, path in new_files]
-    
-    if store is None:
-        # First upload - create new store
-        store, _ = ingest_documents(file_paths)
-        stored_files.extend(new_files)
-        message = f"✅ Indexed {len(store.metadatas)} chunks from {len(new_files)} file(s)."
-    else:
-        # Add to existing store
-        num_chunks, _ = add_documents_to_store(store, file_paths)
-        stored_files.extend(new_files)
-        message = f"✅ Added {num_chunks} chunks from {len(new_files)} file(s). Total: {len(store.metadatas)} chunks."
-    
-    return format_file_list(stored_files), message, None  # Return None to clear the File component
+# ----------  NEW SMALL HELPER  ----------
+def _basename(entries: List[PendingEntry]) -> List[str]:
+    """Extract real names for display."""
+    return [name for name, _ in entries]
 
-def format_file_list(files):
-    """Format file list for display."""
+# ----------  MODIFIED  "process"  LOGIC  ----------
+def process_files() -> tuple:
+    """Ingest everything that is currently queued."""
+    global store, stored_files          # stored_files is still List[(name,path)]
+
+    if not pending_files.value:
+        return format_file_list(stored_files), "❗ No pending files to add.", gr.update(value=None)
+
+    paths = [tmp for _, tmp in pending_files.value]   # ingest needs paths only
+    names = [name for name, _ in pending_files.value] # keep names for UI
+
+    if store is None:                     # first batch
+        store, _ = ingest_documents(paths)
+        stored_files.extend([(n, p) for n, p in zip(names, paths)])
+        msg = f"✅ Indexed {len(store.metadatas)} chunks from {len(paths)} file(s)."
+    else:                                 # incremental
+        num_chunks, _ = add_documents_to_store(store, paths)
+        stored_files.extend([(n, p) for n, p in zip(names, paths)])
+        msg = f"✅ Added {num_chunks} chunks. Total: {len(store.metadatas)}."
+
+    pending_files.value = []              # empty queue
+    return format_file_list(stored_files), msg, gr.update(value=None)
+
+# ----------  NEW DROP HANDLER  ----------
+def on_drop_more(files) -> tuple:
+    """Append newly dropped files to the pending list + clear the box."""
     if not files:
-        return "No files in store"
-    return "\n".join([f"{i}. {name}" for i, (name, _) in enumerate(files)])
+        return pending_files, gr.update(value="\n".join(_basename(pending_files.value))), gr.update(value=None)
+
+    new_entries = [(os.path.basename(f), _save_upload(f)) for f in files]
+    pending_files.value.extend(new_entries)
+
+    return pending_files, \
+           gr.update(value="\n".join(_basename(pending_files.value))), \
+           gr.update(value=None)
+
+def format_file_list(entries: List[tuple[str, str]]) -> str:
+    """Pretty list of real names."""
+    if not entries:
+        return "No files"
+    return "\n".join(f"{i}. {name}" for i, (name, _) in enumerate(entries))
 
 def remove_file(index_str):
     """Remove a specific file from the store."""
@@ -259,54 +289,59 @@ def export_paper(format_choice):
             f.write(last_refs)
         return filepath
 
+# --------------------  GRADIO UI  --------------------
 with gr.Blocks(theme="soft") as app:
     gr.Markdown("## 🧠 Academic Paper Chatbot — RAG + Hugging Face API")
     gr.Markdown("Upload your personal notes (PDF/DOC/DOCX/ODT/TXT), ask a question, and generate an academic paper draft.")
 
     with gr.Row():
         with gr.Column():
-            file_uploader = gr.File(file_count="multiple", label="📂 Upload files to add to store")
+            # -----  file drop zone  -----
+            file_uploader = gr.File(file_count="multiple", label="📂 Upload files")
             add_btn = gr.Button("📥 Add to Store", variant="primary")
-            
+
+            # -----  pending queue (NEW)  -----
+            gr.Markdown("### Pending Files (not yet in store)")
+            pending_display = gr.Textbox(value="", label="Queued", interactive=False, lines=5)
+
+            # -----  already stored  -----
             gr.Markdown("### Files in Store")
             stored_display = gr.Textbox(value="No files in store", label="Stored Files", interactive=False, lines=8)
-            
+
+            # -----  remove / clear  -----
             with gr.Row():
-                remove_index = gr.Textbox(placeholder="Enter index (e.g., 0, 1, 2...)", label="Remove file by index", scale=3)
-                remove_btn = gr.Button("❌ Remove", scale=1)
-            
+                remove_index = gr.Textbox(placeholder="index (0,1,…)", label="Remove file by index", scale=3)
+                remove_btn = gr.Button("❎ Remove", scale=1)
             clear_btn = gr.Button("🗑️ Clear All", variant="secondary")
-            
             status_msg = gr.Markdown()
 
-    query_input = gr.Textbox(label="🎯 Your Question / Essay Prompt", lines=3, placeholder="e.g., Discuss the main theories and their methodological implications.")
+    # ----------  paper generation  ----------
+    query_input = gr.Textbox(label="🎯 Your Question / Essay Prompt", lines=3)
     gen_btn = gr.Button("🧩 Generate Paper")
     output_md = gr.Markdown()
-    
-    # Export section (initially hidden)
     with gr.Row(visible=False) as export_section:
-        format_dropdown = gr.Dropdown(
-            choices=["TXT", "DOCX", "PDF", "MD"],
-            value="DOCX",
-            label="📥 Export Format"
-        )
+        format_dropdown = gr.Dropdown(["TXT", "DOCX", "PDF", "MD"], value="DOCX", label="Export Format")
         export_btn = gr.Button("💾 Download Paper")
-    
-    download_file = gr.File(label="📄 Your Paper", visible=True)
-    
-    # Wire up events
+    download_file = gr.File()
+
+    # ----------  events  ----------
+    # NEW: append on every drop + CLEAR the box so it accepts more files
+    file_uploader.upload(
+        on_drop_more,
+        inputs=[file_uploader],                     # user drop
+        outputs=[pending_files, pending_display, file_uploader]  # <- CLEAR added
+    ).then(lambda: None, None, file_uploader)      # extra insurance: reset value
+
+    # existing buttons keep their original behaviour
     add_btn.click(
-    process_files, 
-    inputs=[file_uploader], 
-    outputs=[stored_display, status_msg, file_uploader]  # Add file_uploader as output
-)
+        process_files,
+        inputs=[],                                  # we read from pending_files state
+        outputs=[stored_display, status_msg, file_uploader]
+    )
     remove_btn.click(remove_file, inputs=[remove_index], outputs=[stored_display, status_msg])
     clear_btn.click(clear_all, inputs=[], outputs=[stored_display, status_msg])
     gen_btn.click(generate_paper, inputs=[query_input], outputs=[output_md, export_section])
     export_btn.click(export_paper, inputs=[format_dropdown], outputs=[download_file])
-
-    gr.Markdown("---")
-    gr.Markdown("⚙️ Powered by Hugging Face Inference API · Built with LangChain, FAISS & Gradio.")
 
 if __name__ == "__main__":
     app.launch()

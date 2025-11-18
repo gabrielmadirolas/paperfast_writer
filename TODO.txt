@@ -15,3 +15,4 @@
 - Comment on the usage of FAISS
 - Add .env_example
 - Make Gradio interface look nicer
+- Show the produced paper in a scrollable textbox, so the interface do not become huge after generating the paper 
