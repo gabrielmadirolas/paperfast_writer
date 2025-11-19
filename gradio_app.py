@@ -22,7 +22,7 @@ stored_files = []          # list of (filename, filepath) tuples already in stor
 last_essay = None
 last_refs = None
 
-def _save_upload(gradio_path: str) -> str:
+def keep_upload(gradio_path: str) -> str:
     """Keep a permanent copy of the file Gradio already saved for us."""
     permanent = tempfile.NamedTemporaryFile(delete=False,
                                           suffix=os.path.splitext(gradio_path)[1])
@@ -54,7 +54,7 @@ def save_uploaded_files(files):
     return paths
 
 # ----------  NEW SMALL HELPER  ----------
-def _basename(entries: List[PendingEntry]) -> List[str]:
+def base_name(entries: List[PendingEntry]) -> List[str]:
     """Extract real names for display."""
     return [name for name, _ in entries]
 
@@ -85,13 +85,13 @@ def process_files() -> tuple:
 def on_drop_more(files) -> tuple:
     """Append newly dropped files to the pending list + clear the box."""
     if not files:
-        return pending_files, gr.update(value="\n".join(_basename(pending_files.value))), gr.update(value=None)
+        return pending_files, gr.update(value="\n".join(base_name(pending_files.value))), gr.update(value=None)
 
-    new_entries = [(os.path.basename(f), _save_upload(f)) for f in files]
+    new_entries = [(os.path.basename(f), keep_upload(f)) for f in files]
     pending_files.value.extend(new_entries)
 
     return pending_files, \
-           gr.update(value="\n".join(_basename(pending_files.value))), \
+           gr.update(value="\n".join(base_name(pending_files.value))), \
            gr.update(value=None)
 
 def format_file_list(entries: List[tuple[str, str]]) -> str:
@@ -169,8 +169,9 @@ def generate_paper(query):
         last_essay = essay
         last_refs = refs
         
-        result = f"### 📄 Generated Academic Paper\n\n{essay}\n\n---\n\n### 🔎 Sources Used\n{refs}"
-        
+        #result = f"### 📄 Generated Academic Paper\n\n{essay}\n\n---\n\n### 🔎 Sources Used\n{refs}"
+        result = f"{essay}\n\n---\n\n### 🔎 Sources Used\n{refs}"
+
         return result, gr.update(visible=True)
         
     except Exception as e:
@@ -292,37 +293,43 @@ def export_paper(format_choice):
 # --------------------  GRADIO UI  --------------------
 with gr.Blocks(theme="soft") as app:
     gr.Markdown("## 🧠 Academic Paper Chatbot — RAG + Hugging Face API")
-    gr.Markdown("Upload your personal notes (PDF/DOC/DOCX/ODT/TXT), ask a question, and generate an academic paper draft.")
+    gr.Markdown("Upload your personal notes, ask a question, and generate an academic paper draft.")
 
+    gr.Markdown("### Pending Files (not yet in store)")
+    with gr.Row():
+        # -----  file drop zone  -----
+        file_uploader = gr.File(file_count="multiple", label="📂 Upload files")
+        with gr.Column():
+            # -----  pending queue (NEW)  -----
+            #gr.Markdown("### Pending Files (not yet in store)")
+            pending_display = gr.Textbox(value="", label="Queued", interactive=False, lines=5)
+            add_btn = gr.Button("📥 Add to Store", variant="secondary")
+
+    gr.Markdown("### Files in Store")
     with gr.Row():
         with gr.Column():
-            # -----  file drop zone  -----
-            file_uploader = gr.File(file_count="multiple", label="📂 Upload files")
-            add_btn = gr.Button("📥 Add to Store", variant="primary")
-
-            # -----  pending queue (NEW)  -----
-            gr.Markdown("### Pending Files (not yet in store)")
-            pending_display = gr.Textbox(value="", label="Queued", interactive=False, lines=5)
-
             # -----  already stored  -----
-            gr.Markdown("### Files in Store")
+            # gr.Markdown("### Files in Store")
             stored_display = gr.Textbox(value="No files in store", label="Stored Files", interactive=False, lines=8)
-
+        with gr.Column():
             # -----  remove / clear  -----
-            with gr.Row():
-                remove_index = gr.Textbox(placeholder="index (0,1,…)", label="Remove file by index", scale=3)
-                remove_btn = gr.Button("❎ Remove", scale=1)
+            remove_index = gr.Textbox(placeholder="index (0,1,…)", label="Remove file by index", scale=3)
+            remove_btn = gr.Button("❎ Remove", variant="secondary", scale=1)
             clear_btn = gr.Button("🗑️ Clear All", variant="secondary")
             status_msg = gr.Markdown()
 
     # ----------  paper generation  ----------
+    gr.Markdown("### Paper Generation")
     query_input = gr.Textbox(label="🎯 Your Question / Essay Prompt", lines=3)
     gen_btn = gr.Button("🧩 Generate Paper")
-    output_md = gr.Markdown()
+
+    # ----------  paper download  ----------
     with gr.Row(visible=False) as export_section:
-        format_dropdown = gr.Dropdown(["TXT", "DOCX", "PDF", "MD"], value="DOCX", label="Export Format")
-        export_btn = gr.Button("💾 Download Paper")
-    download_file = gr.File()
+        output_md = gr.Textbox(label="📄 Generated Paper", lines=8)
+        with gr.Column():
+            format_dropdown = gr.Dropdown(["TXT", "DOCX", "PDF", "MD"], value="DOCX", label="Export Format")
+            export_btn = gr.Button("💾 Download Paper")
+            download_file = gr.File()
 
     # ----------  events  ----------
     # NEW: append on every drop + CLEAR the box so it accepts more files
