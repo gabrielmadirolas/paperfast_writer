@@ -22,6 +22,9 @@ stored_files = []          # list of (filename, filepath) tuples already in stor
 last_essay = None
 last_refs = None
 
+# ----------  DEFAULT UI VALUES  ----------
+pending_value = "No files in queue"
+
 def keep_upload(gradio_path: str) -> str:
     """Keep a permanent copy of the file Gradio already saved for us."""
     permanent = tempfile.NamedTemporaryFile(delete=False,
@@ -64,7 +67,7 @@ def process_files() -> tuple:
     global store, stored_files          # stored_files is still List[(name,path)]
 
     if not pending_files.value:
-        return format_file_list(stored_files), "❗ No pending files to add.", gr.update(value=None)
+        return format_file_list(stored_files), "❗ No pending files to add.", gr.update(value=pending_value)
 
     paths = [tmp for _, tmp in pending_files.value]   # ingest needs paths only
     names = [name for name, _ in pending_files.value] # keep names for UI
@@ -79,7 +82,7 @@ def process_files() -> tuple:
         msg = f"✅ Added {num_chunks} chunks. Total: {len(store.metadatas)}."
 
     pending_files.value = []              # empty queue
-    return format_file_list(stored_files), msg, gr.update(value=None)
+    return format_file_list(stored_files), msg, gr.update(value=pending_value)
 
 # ----------  NEW DROP HANDLER  ----------
 def on_drop_more(files) -> tuple:
@@ -92,7 +95,7 @@ def on_drop_more(files) -> tuple:
 
     return pending_files, \
            gr.update(value="\n".join(base_name(pending_files.value))), \
-           gr.update(value=None)
+           gr.update()
 
 def format_file_list(entries: List[tuple[str, str]]) -> str:
     """Pretty list of real names."""
@@ -302,7 +305,7 @@ with gr.Blocks(theme="soft") as app:
         with gr.Column():
             # -----  pending queue (NEW)  -----
             #gr.Markdown("### Pending Files (not yet in store)")
-            pending_display = gr.Textbox(value="", label="Queued", interactive=False, lines=5)
+            pending_display = gr.Textbox(value=pending_value, label="Queued Files", interactive=False, lines=5)
             add_btn = gr.Button("📥 Add to Store", variant="secondary")
 
     gr.Markdown("### Files in Store")
@@ -311,12 +314,12 @@ with gr.Blocks(theme="soft") as app:
             # -----  already stored  -----
             # gr.Markdown("### Files in Store")
             stored_display = gr.Textbox(value="No files in store", label="Stored Files", interactive=False, lines=8)
+            status_msg = gr.Markdown()
         with gr.Column():
             # -----  remove / clear  -----
             remove_index = gr.Textbox(placeholder="index (0,1,…)", label="Remove file by index", scale=3)
             remove_btn = gr.Button("❎ Remove", variant="secondary", scale=1)
             clear_btn = gr.Button("🗑️ Clear All", variant="secondary")
-            status_msg = gr.Markdown()
 
     # ----------  paper generation  ----------
     gr.Markdown("### Paper Generation")
@@ -343,7 +346,7 @@ with gr.Blocks(theme="soft") as app:
     add_btn.click(
         process_files,
         inputs=[],                                  # we read from pending_files state
-        outputs=[stored_display, status_msg, file_uploader]
+        outputs=[stored_display, status_msg, pending_display]
     )
     remove_btn.click(remove_file, inputs=[remove_index], outputs=[stored_display, status_msg])
     clear_btn.click(clear_all, inputs=[], outputs=[stored_display, status_msg])
