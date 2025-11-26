@@ -19,7 +19,8 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
+GEN_MODEL = "meta-llama/Llama-3.1-405B-Instruct"
+# GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct" # In case the above is too much inference-consuming
 FBACK_GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # To be fallback model.
 
 # -------- Hugging Face Clients --------
@@ -194,11 +195,9 @@ def generate_essay(prompt: str) -> str:
     
     # Method 1: Try chat.completions.create (OpenAI-compatible, preferred)
     try:
-        client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
-        
         print(f"Attempting chat.completions.create with model: {GEN_MODEL}")
         
-        completion = client.chat.completions.create(
+        completion = gen_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": "/no_think"},
                 {"role": "user", "content": prompt}
@@ -209,6 +208,7 @@ def generate_essay(prompt: str) -> str:
         
         # Extract the generated text
         generated_text = completion.choices[0].message.content
+        print(completion.choices[0].message) # Here for debugingging purposes, remove later
         print(f"chat.completions.create successful!")
         print(f"Generated {len(generated_text)} characters")
         
@@ -234,7 +234,7 @@ def generate_essay(prompt: str) -> str:
         try:
             print(f"Trying text_generation with model: {GEN_MODEL}")
             
-            response = client.text_generation(
+            response = gen_client.text_generation(
                 prompt=prompt,
                 max_new_tokens=2500,
                 temperature=0.7,
@@ -258,7 +258,7 @@ def generate_essay(prompt: str) -> str:
                     {"role": "user", "content": prompt}
                 ]
                 
-                response = client.chat_completion(
+                response = gen_client.chat_completion(
                     messages=messages,
                     max_tokens=2500,
                     temperature=0.7
