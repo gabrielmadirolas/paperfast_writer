@@ -19,14 +19,12 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-# GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # To be fallback model.
-# GEN_MODEL = "Qwen/Qwen2.5-32B-Instruct" # Does not work. It says that it has none of my allowed inference providers. Check later whether this continues
 GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
+FBACK_GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # To be fallback model.
 
 # -------- Hugging Face Clients --------
 embed_client = InferenceClient(model=EMBED_MODEL, token=HF_TOKEN)
-# Don't create gen_client here since we'll create it in the function
-# gen_client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
+gen_client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
 
 # -------- Document Loaders --------
 def extract_text_from_pdf(path: str) -> str:
@@ -191,20 +189,16 @@ If information is missing, write 'not present in notes' instead of inventing it.
 ### ESSAY
 """
 
-
-# chat.completions version
-
 def generate_essay(prompt: str) -> str:
     """Generate essay using Hugging Face InferenceClient with multiple fallback methods."""
     
     # Method 1: Try chat.completions.create (OpenAI-compatible, preferred)
     try:
-        client = InferenceClient(token=HF_TOKEN)
+        client = InferenceClient(model=GEN_MODEL, token=HF_TOKEN)
         
         print(f"Attempting chat.completions.create with model: {GEN_MODEL}")
         
         completion = client.chat.completions.create(
-            model=GEN_MODEL,
             messages=[
                 {"role": "system", "content": "/no_think"},
                 {"role": "user", "content": prompt}
@@ -239,11 +233,9 @@ def generate_essay(prompt: str) -> str:
         # Method 2: Try text_generation (for base/completion models)
         try:
             print(f"Trying text_generation with model: {GEN_MODEL}")
-            client = InferenceClient(token=HF_TOKEN)
             
             response = client.text_generation(
                 prompt=prompt,
-                model=GEN_MODEL,
                 max_new_tokens=2500,
                 temperature=0.7,
                 return_full_text=False
@@ -260,7 +252,6 @@ def generate_essay(prompt: str) -> str:
             # Method 3: Try legacy chat_completion (last resort)
             try:
                 print(f"Trying legacy chat_completion with model: {GEN_MODEL}")
-                client = InferenceClient(token=HF_TOKEN)
                 
                 messages = [
                     {"role": "system", "content": "/no_think"},
@@ -269,7 +260,6 @@ def generate_essay(prompt: str) -> str:
                 
                 response = client.chat_completion(
                     messages=messages,
-                    model=GEN_MODEL,
                     max_tokens=2500,
                     temperature=0.7
                 )
