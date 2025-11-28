@@ -19,8 +19,8 @@ if not HF_TOKEN:
     raise RuntimeError("Set HF_API_TOKEN environment variable with your Hugging Face token.")
 
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-GEN_MODEL = "meta-llama/Llama-3.1-405B-Instruct"
-# GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct" # In case the above is too much inference-consuming
+# GEN_MODEL = "meta-llama/Llama-3.1-405B-Instruct" # Wasn't working last time, but I wish it to be the main option
+GEN_MODEL = "meta-llama/Llama-3.3-70B-Instruct" # In case the above is too much inference-consuming
 FBACK_GEN_MODEL = "HuggingFaceTB/SmolLM3-3B" # To be fallback model.
 
 # -------- Hugging Face Clients --------
