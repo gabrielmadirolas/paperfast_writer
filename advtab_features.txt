@@ -2,4 +2,6 @@ Here are the features I want the Advanced Options Tab to incorporate:
 - Save the current vector store, including track of file names.
 - Load saved vector store, including file names so they can be managed in the main tab.
 - Change models, both for embedding and for generation.
+- Allow user to specify RAG (chunk size, overlap, search method, k, ...) and LLM parameters (temperature, ...)
 - Ideally, ask the chatbot to tailor the paper beyond what is already set by default or can be achieved simply with the user query: number and type of content of the sections, length, etc.
+- Ok, I checked and you can already ask for the sections in the user query. But the idea is to stay simple in the query, and ask for sections and more detailed tailoring in the Advanced Options Tab.

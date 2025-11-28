@@ -297,61 +297,69 @@ def export_paper(format_choice):
 with gr.Blocks(theme="soft") as app:
     gr.Markdown("## 🧠 Academic Paper Chatbot — RAG + Hugging Face API")
     gr.Markdown("Upload your personal notes, ask a question, and generate an academic paper draft.")
+    with gr.Tab("Dashboard"):
+        gr.Markdown("### Pending Files (not yet in store)")
+        with gr.Row():
+            # -----  file drop zone  -----
+            file_uploader = gr.File(file_count="multiple", label="📂 Upload files")
+            with gr.Column():
+                # -----  pending queue (NEW)  -----
+                #gr.Markdown("### Pending Files (not yet in store)")
+                pending_display = gr.Textbox(value=pending_value, label="Queued Files", interactive=False, lines=5)
+                add_btn = gr.Button("📥 Add to Store", variant="secondary")
 
-    gr.Markdown("### Pending Files (not yet in store)")
-    with gr.Row():
-        # -----  file drop zone  -----
-        file_uploader = gr.File(file_count="multiple", label="📂 Upload files")
-        with gr.Column():
-            # -----  pending queue (NEW)  -----
-            #gr.Markdown("### Pending Files (not yet in store)")
-            pending_display = gr.Textbox(value=pending_value, label="Queued Files", interactive=False, lines=5)
-            add_btn = gr.Button("📥 Add to Store", variant="secondary")
+        gr.Markdown("### Files in Store")
+        with gr.Row():
+            with gr.Column():
+                # -----  already stored  -----
+                # gr.Markdown("### Files in Store")
+                stored_display = gr.Textbox(value="No files in store", label="Stored Files", interactive=False, lines=8)
+                status_msg = gr.Markdown()
+            with gr.Column():
+                # -----  remove / clear  -----
+                remove_index = gr.Textbox(placeholder="index (0,1,…)", label="Remove file by index", scale=3)
+                remove_btn = gr.Button("❎ Remove", variant="secondary", scale=1)
+                clear_btn = gr.Button("🗑️ Clear All", variant="secondary")
 
-    gr.Markdown("### Files in Store")
-    with gr.Row():
-        with gr.Column():
-            # -----  already stored  -----
-            # gr.Markdown("### Files in Store")
-            stored_display = gr.Textbox(value="No files in store", label="Stored Files", interactive=False, lines=8)
-            status_msg = gr.Markdown()
-        with gr.Column():
-            # -----  remove / clear  -----
-            remove_index = gr.Textbox(placeholder="index (0,1,…)", label="Remove file by index", scale=3)
-            remove_btn = gr.Button("❎ Remove", variant="secondary", scale=1)
-            clear_btn = gr.Button("🗑️ Clear All", variant="secondary")
+        # ----------  paper generation  ----------
+        gr.Markdown("### Paper Generation")
+        query_input = gr.Textbox(label="🎯 Your Question / Essay Prompt", lines=3)
+        gen_btn = gr.Button("🧩 Generate Paper")
 
-    # ----------  paper generation  ----------
-    gr.Markdown("### Paper Generation")
-    query_input = gr.Textbox(label="🎯 Your Question / Essay Prompt", lines=3)
-    gen_btn = gr.Button("🧩 Generate Paper")
+        # ----------  paper download  ----------
+        with gr.Row(visible=False) as export_section:
+            output_md = gr.Textbox(label="📄 Generated Paper", lines=8)
+            with gr.Column():
+                format_dropdown = gr.Dropdown(["TXT", "DOCX", "PDF", "MD"], value="DOCX", label="Export Format")
+                export_btn = gr.Button("💾 Download Paper")
+                download_file = gr.File()
 
-    # ----------  paper download  ----------
-    with gr.Row(visible=False) as export_section:
-        output_md = gr.Textbox(label="📄 Generated Paper", lines=8)
-        with gr.Column():
-            format_dropdown = gr.Dropdown(["TXT", "DOCX", "PDF", "MD"], value="DOCX", label="Export Format")
-            export_btn = gr.Button("💾 Download Paper")
-            download_file = gr.File()
+        # ----------  events  ----------
+        # NEW: append on every drop + CLEAR the box so it accepts more files
+        file_uploader.upload(
+            on_drop_more,
+            inputs=[file_uploader],                     # user drop
+            outputs=[pending_files, pending_display, file_uploader]  # <- CLEAR added
+        ).then(lambda: None, None, file_uploader)      # extra insurance: reset value
 
-    # ----------  events  ----------
-    # NEW: append on every drop + CLEAR the box so it accepts more files
-    file_uploader.upload(
-        on_drop_more,
-        inputs=[file_uploader],                     # user drop
-        outputs=[pending_files, pending_display, file_uploader]  # <- CLEAR added
-    ).then(lambda: None, None, file_uploader)      # extra insurance: reset value
-
-    # existing buttons keep their original behaviour
-    add_btn.click(
-        process_files,
-        inputs=[],                                  # we read from pending_files state
-        outputs=[stored_display, status_msg, pending_display]
-    )
-    remove_btn.click(remove_file, inputs=[remove_index], outputs=[stored_display, status_msg])
-    clear_btn.click(clear_all, inputs=[], outputs=[stored_display, status_msg])
-    gen_btn.click(generate_paper, inputs=[query_input], outputs=[output_md, export_section])
-    export_btn.click(export_paper, inputs=[format_dropdown], outputs=[download_file])
-
+        # existing buttons keep their original behaviour
+        add_btn.click(
+            process_files,
+            inputs=[],                                  # we read from pending_files state
+            outputs=[stored_display, status_msg, pending_display]
+        )
+        remove_btn.click(remove_file, inputs=[remove_index], outputs=[stored_display, status_msg])
+        clear_btn.click(clear_all, inputs=[], outputs=[stored_display, status_msg])
+        gen_btn.click(generate_paper, inputs=[query_input], outputs=[output_md, export_section])
+        export_btn.click(export_paper, inputs=[format_dropdown], outputs=[download_file])
+    with gr.Tab("Advanced Options"):
+        gr.Markdown("### Tailor Paper Structure")
+        gr.Markdown("### Load or Save Store")
+        with gr.Row():
+            with gr.Column():
+                store_selector = gr.FileExplorer(label="Select store file")
+            with gr.Column():
+                store_saver = gr.DownloadButton(label="Download store file")
+        gr.Markdown("### Manage LLM Models")
 if __name__ == "__main__":
     app.launch()
