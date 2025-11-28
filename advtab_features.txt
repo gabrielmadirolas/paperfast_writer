@@ -1,0 +1,5 @@
+Here are the features I want the Advanced Options Tab to incorporate:
+- Save the current vector store, including track of file names.
+- Load saved vector store, including file names so they can be managed in the main tab.
+- Change models, both for embedding and for generation.
+- Ideally, ask the chatbot to tailor the paper beyond what is already set by default or can be achieved simply with the user query: number and type of content of the sections, length, etc.
