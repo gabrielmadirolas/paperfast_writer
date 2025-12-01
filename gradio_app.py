@@ -11,12 +11,11 @@ from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# ----------  NEW  ----------
+# ----------  GLOBAL VARIABLES  ----------
 PendingEntry = Tuple[str, str]          # (real_name, temp_path)
 pending_files = gr.State()
 pending_files.value: List[PendingEntry] = []   # list of absolute paths not yet indexed 
 
-# ----------  EXISTING GLOBALS  ----------
 store = None
 stored_files = []          # list of (filename, filepath) tuples already in store
 last_essay = None
@@ -357,9 +356,9 @@ with gr.Blocks(theme="soft") as app:
         gr.Markdown("### Load or Save Store")
         with gr.Row():
             with gr.Column():
-                store_selector = gr.FileExplorer(label="Select store file")
+                store_selector = gr.File(label="Select store file")
             with gr.Column():
-                store_saver = gr.DownloadButton(label="Download store file")
+                store_saver = gr.DownloadButton(label="Save store file")
         gr.Markdown("### Manage LLM Models")
 if __name__ == "__main__":
     app.launch()
