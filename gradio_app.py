@@ -3,7 +3,7 @@ import gradio as gr, os, shutil, tempfile
 from datetime import datetime
 from typing import Tuple, List
 from rag_chatbot import (ingest_documents, retrieve_relevant, build_prompt,
-                         generate_essay, add_documents_to_store)
+                         generate_essay, add_documents_to_store, export_store, import_store)
 
 # For file export
 from docx import Document
@@ -150,6 +150,41 @@ def clear_all():
     store = None
     
     return "No files in store", "🗑️ All files cleared from store."
+
+# ----------  SAVE / LOAD  ----------
+def save_store_file() -> str:
+    """Return *path* of the saved store (gzipped json)."""
+    if store is None:
+        gr.Warning("No store to save")
+        return ""                # empty path → button disabled
+    
+    blob = export_store(store)
+    tmp_path = tempfile.NamedTemporaryFile(delete=False, suffix=".vsto.json").name
+    with open(tmp_path, "wb") as f:
+        f.write(blob)
+    return tmp_path              # Gradio offers this file for download
+
+def load_store_file(file) -> tuple:
+    """Called by gr.File – uploads a *.vsto.json store."""
+    global store, stored_files
+    if file is None:
+        return format_file_list(stored_files), "❗ No file selected."
+
+    try:
+        # Gradio gives either str (path) or bytes; handle both
+        if isinstance(file, str):
+            with open(file, "rb") as f:
+                blob = f.read()
+        else:
+            blob = file.read() if hasattr(file, "read") else file
+
+        store = import_store(blob)
+        # rebuild UI list from metadata (we only have basename in meta)
+        stored_files = [(meta["source"], "loaded") for meta in store.metadatas]
+        # (optional) give unique dummy paths if you need them later
+        return format_file_list(stored_files), f"✅ Loaded store with {len(store.metadatas)} chunks."
+    except ValueError as e:
+        return format_file_list(stored_files), f"❌ {e}"
 
 def generate_paper(query):
     global store, last_essay, last_refs
@@ -334,14 +369,11 @@ with gr.Blocks(theme="soft") as app:
                 download_file = gr.File()
 
         # ----------  events  ----------
-        # NEW: append on every drop + CLEAR the box so it accepts more files
         file_uploader.upload(
             on_drop_more,
             inputs=[file_uploader],                     # user drop
             outputs=[pending_files, pending_display, file_uploader]  # <- CLEAR added
         ).then(lambda: None, None, file_uploader)      # extra insurance: reset value
-
-        # existing buttons keep their original behaviour
         add_btn.click(
             process_files,
             inputs=[],                                  # we read from pending_files state
@@ -351,14 +383,32 @@ with gr.Blocks(theme="soft") as app:
         clear_btn.click(clear_all, inputs=[], outputs=[stored_display, status_msg])
         gen_btn.click(generate_paper, inputs=[query_input], outputs=[output_md, export_section])
         export_btn.click(export_paper, inputs=[format_dropdown], outputs=[download_file])
+    
     with gr.Tab("Advanced Options"):
         gr.Markdown("### Tailor Paper Structure")
         gr.Markdown("### Load or Save Store")
         with gr.Row():
             with gr.Column():
-                store_selector = gr.File(label="Select store file")
+                store_selector = gr.File(label="Select store file (*.vsto.json)")
+                load_btn = gr.Button("📂 Load Store")
             with gr.Column():
-                store_saver = gr.DownloadButton(label="Save store file")
+                save_btn = gr.Button("💾 Save Current Store", variant="secondary")
+                store_saver = gr.DownloadButton(label="⬇ Download store file", visible=False) # hidden placeholder
         gr.Markdown("### Manage LLM Models")
+
+        # ----------  events (advanced options) ----------
+        load_btn.click(load_store_file,
+            inputs=[store_selector],
+            outputs=[stored_display, status_msg]
+            )
+        save_btn.click(save_store_file,
+            inputs=[],
+            outputs=[store_saver]
+            ).then(  # fill the hidden File component
+                lambda f: gr.update(value=f, visible=True),  # make it visible for download
+                inputs=[store_saver],
+                outputs=[store_saver]
+                )
+        
 if __name__ == "__main__":
     app.launch()
