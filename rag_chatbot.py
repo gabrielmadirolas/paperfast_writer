@@ -163,7 +163,7 @@ def add_documents_to_store(store: VectorStore, paths: List[str]) -> Tuple[int, i
 
 def export_store(store: VectorStore) -> bytes:
     """Serialize whole store to gzipped JSON bytes."""
-    # 1. Serialize FAISS index to bytes
+    # Serialize FAISS index to bytes
     tmp_idx = tempfile.NamedTemporaryFile(delete=False, suffix='.index')
     try:
         faiss.write_index(store.index, tmp_idx.name)
@@ -171,81 +171,47 @@ def export_store(store: VectorStore) -> bytes:
         with open(tmp_idx.name, "rb") as f:
             idx_bytes = f.read()
     finally:
-        try:
-            os.remove(tmp_idx.name)
-        except:
-            pass
+        os.remove(tmp_idx.name)
 
-    # 2. Create package
+    # Create package
     package = {
         "index_b64": base64.b64encode(idx_bytes).decode(),
         "metadata": store.metadatas,
         "dim": store.index.d,
     }
     
-    # 3. Serialize to JSON and compress
+    # Serialize to JSON and compress
     json_bytes = json.dumps(package, ensure_ascii=False).encode()
     return gzip.compress(json_bytes)
 
 
 def import_store(blob: bytes) -> VectorStore:
-    """
-    Inverse of export_store. Raises ValueError on corrupted file.
-    """
+    """Deserialize store from gzipped JSON bytes."""
+    # Decompress and parse JSON
+    json_bytes = gzip.decompress(blob)
+    package = json.loads(json_bytes.decode())
+    
+    # Extract fields
+    index_b64 = package["index_b64"]
+    meta_list = package["metadata"]
+    dim = package["dim"]
+    
+    # Decode base64 and write to temp file
+    index_bytes = base64.b64decode(index_b64)
+    tmp_idx = tempfile.NamedTemporaryFile(delete=False, suffix='.index')
     try:
-        # Step 1: Decompress
-        try:
-            json_bytes = gzip.decompress(blob)
-        except Exception as e:
-            raise ValueError(f"Failed to decompress: {e}") from e
-        
-        # Step 2: Parse JSON
-        try:
-            package = json.loads(json_bytes.decode())
-        except Exception as e:
-            raise ValueError(f"Failed to parse JSON: {e}") from e
-        
-        # Step 3: Extract fields
-        try:
-            index_b64 = package["index_b64"]
-            meta_list = package["metadata"]
-            dim = package["dim"]
-        except KeyError as e:
-            raise ValueError(f"Missing key in package: {e}") from e
-        
-        # Step 4: Decode base64
-        try:
-            index_bytes = base64.b64decode(index_b64)
-        except Exception as e:
-            raise ValueError(f"Failed to decode base64: {e}") from e
-        
-        # Step 5: Write to temp file and read with FAISS
-        tmp_idx = tempfile.NamedTemporaryFile(delete=False, suffix='.index')
-        try:
-            tmp_idx.write(index_bytes)
-            tmp_idx.close()
-            
-            # Read index from file
-            index = faiss.read_index(tmp_idx.name)
-        except Exception as e:
-            raise ValueError(f"Failed to read FAISS index: {e}") from e
-        finally:
-            try:
-                os.remove(tmp_idx.name)
-            except:
-                pass
-        
-        # Step 6: Reconstruct VectorStore
-        store = VectorStore(dim)
-        store.index = index
-        store.metadatas = meta_list
-        
-        return store
-        
-    except ValueError:
-        raise  # Re-raise ValueError as-is
-    except Exception as e:
-        raise ValueError(f"Unexpected error: {type(e).__name__}: {e}") from e
+        tmp_idx.write(index_bytes)
+        tmp_idx.close()
+        index = faiss.read_index(tmp_idx.name)
+    finally:
+        os.remove(tmp_idx.name)
+    
+    # Reconstruct VectorStore
+    store = VectorStore(dim)
+    store.index = index
+    store.metadatas = meta_list
+    
+    return store
 
 # -------- Pipeline Functions --------
 def ingest_documents(paths: List[str]) -> Tuple[VectorStore, int]:
