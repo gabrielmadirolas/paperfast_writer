@@ -63,20 +63,20 @@ def base_name(entries: List[PendingEntry]) -> List[str]:
 # ----------  MODIFIED  "process"  LOGIC  ----------
 def process_files() -> tuple:
     """Ingest everything that is currently queued."""
-    global store, stored_files          # stored_files is still List[(name,path)]
+    global store, stored_files
 
     if not pending_files.value:
-        return format_file_list(stored_files), "❗ No pending files to add.", gr.update(value=pending_value)
+        return format_file_list(stored_files), "⚠ No pending files to add.", gr.update(value=pending_value)
 
-    paths = [tmp for _, tmp in pending_files.value]   # ingest needs paths only
-    names = [name for name, _ in pending_files.value] # keep names for UI
+    paths = [tmp for _, tmp in pending_files.value]   # temp paths for processing
+    names = [name for name, _ in pending_files.value] # original names for metadata
 
     if store is None:                     # first batch
-        store, _ = ingest_documents(paths)
+        store, _ = ingest_documents(paths, filenames=names)
         stored_files.extend([(n, p) for n, p in zip(names, paths)])
         msg = f"✅ Indexed {len(store.metadatas)} chunks from {len(paths)} file(s)."
     else:                                 # incremental
-        num_chunks, _ = add_documents_to_store(store, paths)
+        num_chunks, _ = add_documents_to_store(store, paths, filenames=names)
         stored_files.extend([(n, p) for n, p in zip(names, paths)])
         msg = f"✅ Added {num_chunks} chunks. Total: {len(store.metadatas)}."
 
@@ -107,12 +107,12 @@ def remove_file(index_str):
     global store, stored_files
     
     if not index_str or not stored_files:
-        return format_file_list(stored_files), "❗ Invalid index or no files to remove."
+        return format_file_list(stored_files), "⚠ Invalid index or no files to remove."
     
     try:
         idx = int(index_str)
         if idx < 0 or idx >= len(stored_files):
-            return format_file_list(stored_files), "❗ Index out of range."
+            return format_file_list(stored_files), "⚠ Index out of range."
         
         # Remove file
         name, path = stored_files.pop(idx)
@@ -124,7 +124,8 @@ def remove_file(index_str):
         # Rebuild store without this file
         if stored_files:
             remaining_paths = [path for _, path in stored_files]
-            store, _ = ingest_documents(remaining_paths)
+            remaining_names = [name for name, _ in stored_files]
+            store, _ = ingest_documents(remaining_paths, filenames=remaining_names)
             message = f"✅ Removed '{name}'. Store rebuilt with {len(stored_files)} file(s)."
         else:
             store = None
@@ -133,7 +134,7 @@ def remove_file(index_str):
         return format_file_list(stored_files), message
         
     except ValueError:
-        return format_file_list(stored_files), "❗ Please enter a valid number."
+        return format_file_list(stored_files), "⚠ Please enter a valid number."
 
 def clear_all():
     """Clear all files from the store."""
@@ -165,10 +166,10 @@ def save_store_file() -> str:
     return tmp_path              # Gradio offers this file for download
 
 def load_store_file(file) -> tuple:
-    """Called by gr.File – uploads a *.vsto.json store."""
+    """Called by gr.File — uploads a *.vsto.json store."""
     global store, stored_files
     if file is None:
-        return format_file_list(stored_files), "❗ No file selected."
+        return format_file_list(stored_files), "⚠ No file selected."
 
     try:
         # Gradio gives either str (path) or bytes; handle both
@@ -179,11 +180,21 @@ def load_store_file(file) -> tuple:
             blob = file.read() if hasattr(file, "read") else file
 
         store = import_store(blob)
-        # rebuild UI list from metadata (we only have basename in meta)
-        stored_files = [(meta["source"], "loaded") for meta in store.metadatas]
-        # (optional) give unique dummy paths if you need them later
-        return format_file_list(stored_files), f"✅ Loaded store with {len(store.metadatas)} chunks."
-    except ValueError as e:
+        
+        # Extract unique source filenames from metadata
+        unique_sources = []
+        seen_sources = set()
+        for meta in store.metadatas:
+            source = meta["source"]
+            if source not in seen_sources:
+                unique_sources.append(source)
+                seen_sources.add(source)
+        
+        # Rebuild UI list with unique filenames (use "loaded" as dummy path)
+        stored_files = [(source, "loaded") for source in unique_sources]
+        
+        return format_file_list(stored_files), f"✅ Loaded store with {len(store.metadatas)} chunks from {len(stored_files)} file(s)."
+    except Exception as e:
         return format_file_list(stored_files), f"❌ {e}"
 
 def generate_paper(query):

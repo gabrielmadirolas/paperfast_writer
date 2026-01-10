@@ -141,15 +141,27 @@ class VectorStore:
             results.append((float(score), self.metadatas[idx]))
         return results
 
-def add_documents_to_store(store: VectorStore, paths: List[str]) -> Tuple[int, int]:
-    """Add new documents to an existing vector store."""
+def add_documents_to_store(store: VectorStore, paths: List[str], filenames: List[str] = None) -> Tuple[int, int]:
+    """
+    Add new documents to an existing vector store.
+    
+    Args:
+        store: Existing vector store
+        paths: List of file paths to add
+        filenames: Optional list of original filenames (if different from paths)
+    """
     all_chunks, metas = [], []
-    for path in paths:
+    
+    # If no filenames provided, extract from paths
+    if filenames is None:
+        filenames = [os.path.basename(p) for p in paths]
+    
+    for path, filename in zip(paths, filenames):
         text = extract_text(path)
         chunks = chunk_text(text)
         for i, c in enumerate(chunks):
             all_chunks.append(c)
-            metas.append({"source": os.path.basename(path), "chunk": i, "text": c})
+            metas.append({"source": filename, "chunk": i, "text": c})
     
     if not all_chunks:
         return 0, 0
@@ -214,20 +226,31 @@ def import_store(blob: bytes) -> VectorStore:
     return store
 
 # -------- Pipeline Functions --------
-def ingest_documents(paths: List[str]) -> Tuple[VectorStore, int]:
+def ingest_documents(paths: List[str], filenames: List[str] = None) -> Tuple[VectorStore, int]:
+    """
+    Ingest documents and create vector store.
+    
+    Args:
+        paths: List of file paths to process
+        filenames: Optional list of original filenames (if different from paths)
+    """
     all_chunks, metas = [], []
-    for path in paths:
+    
+    # If no filenames provided, extract from paths
+    if filenames is None:
+        filenames = [os.path.basename(p) for p in paths]
+    
+    for path, filename in zip(paths, filenames):
         text = extract_text(path)
         chunks = chunk_text(text)
         for i, c in enumerate(chunks):
             all_chunks.append(c)
-            metas.append({"source": os.path.basename(path), "chunk": i, "text": c})
+            metas.append({"source": filename, "chunk": i, "text": c})
 
     vectors = embed_texts(all_chunks)
     dim = vectors[0].shape[0]
     store = VectorStore(dim)
     store.add(vectors, metas)
-    #print(store) # delete comment
     return store, dim
 
 def retrieve_relevant(store: VectorStore, query: str, k: int = 5):
