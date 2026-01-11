@@ -12,10 +12,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import numpy as np
 import faiss
 
-import base64
 import tempfile
 import json
 import gzip
+import struct
 import io
 
 from huggingface_hub import InferenceClient
@@ -174,55 +174,61 @@ def add_documents_to_store(store: VectorStore, paths: List[str], filenames: List
 # -------- Save & Load Vector Store --------
 
 def export_store(store: VectorStore) -> bytes:
-    """Serialize whole store to gzipped JSON bytes."""
-    # Serialize FAISS index to bytes
-    tmp_idx = tempfile.NamedTemporaryFile(delete=False, suffix='.index')
+    """Serialize whole store to gzipped binary format."""
+    # Write FAISS index to temp file
+    with tempfile.NamedTemporaryFile(suffix='.index', delete=False) as tmp:
+        tmp_path = tmp.name
+    
     try:
-        faiss.write_index(store.index, tmp_idx.name)
-        tmp_idx.close()
-        with open(tmp_idx.name, "rb") as f:
-            idx_bytes = f.read()
+        faiss.write_index(store.index, tmp_path)
+        with open(tmp_path, "rb") as f:
+            index_bytes = f.read()
     finally:
-        os.remove(tmp_idx.name)
+        os.remove(tmp_path)
 
-    # Create package
-    package = {
-        "index_b64": base64.b64encode(idx_bytes).decode(),
+    # Serialize metadata
+    meta_bytes = json.dumps({
         "metadata": store.metadatas,
         "dim": store.index.d,
-    }
-    
-    # Serialize to JSON and compress
-    json_bytes = json.dumps(package, ensure_ascii=False).encode()
-    return gzip.compress(json_bytes)
+    }, ensure_ascii=False).encode("utf-8")
+
+    # Create binary layout: [4 bytes index size][index bytes][metadata bytes]
+    buffer = io.BytesIO()
+    buffer.write(struct.pack("I", len(index_bytes)))
+    buffer.write(index_bytes)
+    buffer.write(meta_bytes)
+
+    return gzip.compress(buffer.getvalue())
 
 
 def import_store(blob: bytes) -> VectorStore:
-    """Deserialize store from gzipped JSON bytes."""
-    # Decompress and parse JSON
-    json_bytes = gzip.decompress(blob)
-    package = json.loads(json_bytes.decode())
+    """Deserialize store from gzipped binary format."""
+    data = gzip.decompress(blob)
+    buffer = io.BytesIO(data)
+
+    # Read index size and bytes
+    index_size = struct.unpack("I", buffer.read(4))[0]
+    index_bytes = buffer.read(index_size)
     
-    # Extract fields
-    index_b64 = package["index_b64"]
-    meta_list = package["metadata"]
-    dim = package["dim"]
+    # Read FAISS index from temp file
+    with tempfile.NamedTemporaryFile(suffix='.index', delete=False) as tmp:
+        tmp_path = tmp.name
+        tmp.write(index_bytes)
     
-    # Decode base64 and write to temp file
-    index_bytes = base64.b64decode(index_b64)
-    tmp_idx = tempfile.NamedTemporaryFile(delete=False, suffix='.index')
     try:
-        tmp_idx.write(index_bytes)
-        tmp_idx.close()
-        index = faiss.read_index(tmp_idx.name)
+        index = faiss.read_index(tmp_path)
     finally:
-        os.remove(tmp_idx.name)
-    
+        os.remove(tmp_path)
+
+    # Read metadata
+    meta_bytes = buffer.read()
+    meta = json.loads(meta_bytes.decode("utf-8"))
+
     # Reconstruct VectorStore
-    store = VectorStore(dim)
+    store = VectorStore(meta["dim"])
     store.index = index
-    store.metadatas = meta_list
-    
+    store.metadatas = meta["metadata"]
+
     return store
 
 # -------- Pipeline Functions --------
