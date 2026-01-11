@@ -5,8 +5,8 @@ import numpy as np
 import faiss
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.document_loaders import Docx2txtLoader
-from odf import text, teletype
-from odf.opendocument import load
+from odf import text as odf_text, teletype
+from odf.opendocument import load as odf_load
 import textract
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from huggingface_hub import InferenceClient
@@ -51,8 +51,8 @@ def extract_text_from_doc(path: str) -> str:
 def extract_text_from_odt(path: str) -> str:
     """Extract text from ODT files using odfpy."""
     try:  
-        doc = load(path)
-        all_paragraphs = doc.getElementsByType(text.P)
+        doc = odf_load(path)
+        all_paragraphs = doc.getElementsByType(odf_text.P)
         text_content = []
         
         for paragraph in all_paragraphs:
