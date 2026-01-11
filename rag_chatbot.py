@@ -294,7 +294,7 @@ def generate_essay(prompt: str) -> str:
         
         # Extract the generated text
         generated_text = completion.choices[0].message.content
-        print(completion.choices[0].message) # Here for debugingging purposes, remove later
+        # print(completion.choices[0].message) # Here for debugingging purposes, remove later
         print(f"chat.completions.create successful!")
         print(f"Generated {len(generated_text)} characters")
         
